@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quản Lý Prompt Video (GitHub Pages)</title>
+    <title>Lệnh Prompt Video</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -21,13 +21,43 @@
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             width: 100%;
-            max-width: 650px; /* Mở rộng chiều ngang cho dễ nhìn prompt dài */
+            max-width: 750px;
         }
 
         h2 {
             text-align: center;
             color: #333;
             margin-top: 0;
+        }
+
+        /* Khu vực Upload file */
+        .upload-box {
+            background: #eef2f7;
+            padding: 15px;
+            border-radius: 6px;
+            border: 2px dashed #b0c4de;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .upload-box input[type="file"] {
+            display: none;
+        }
+
+        .upload-btn {
+            background-color: #4682b4;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+            display: inline-block;
+            transition: background 0.2s;
+        }
+
+        .upload-btn:hover {
+            background-color: #315f86;
         }
 
         /* Form nhập liệu */
@@ -60,7 +90,7 @@
             font-size: 14px;
             font-family: inherit;
             resize: vertical;
-            min-height: 100px;
+            min-height: 80px;
         }
 
         .btn-group {
@@ -99,39 +129,38 @@
         }
         .btn-cancel:hover { background-color: #5a6268; }
 
-        /* Danh sách item */
+        /* Danh sách item (Hiển thị 1 dòng và nút cùng hàng) */
         .account-item {
             display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            padding: 15px 0;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 0;
             border-bottom: 1px solid #eee;
+            gap: 10px;
         }
 
         .account-item:last-child {
             border-bottom: none;
         }
 
+        /* Văn bản chỉ hiện 1 dòng, tràn viền sẽ hiện dấu ... */
         .acc-text {
             font-size: 14px;
             color: #333;
-            white-space: pre-wrap;
-            word-break: break-word;
-            width: 100%;
             background: #f9f9f9;
-            padding: 10px;
+            padding: 8px 10px;
             border-radius: 4px;
             border: 1px solid #eee;
-            margin-bottom: 10px;
-            max-height: 120px;
-            overflow-y: auto;
+            flex-grow: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .action-buttons {
             display: flex;
-            gap: 8px;
-            width: 100%;
-            justify-content: flex-end;
+            gap: 5px;
+            flex-shrink: 0;
         }
 
         .copy-btn {
@@ -165,6 +194,15 @@
     <div class="container">
         <h2>Quản Lý Prompt Video</h2>
 
+        <!-- Khung Upload file index.txt thủ công -->
+        <div class="upload-box">
+            <p style="margin: 0 0 10px 0; font-size: 13px; color: #555;">Chọn file <b>index.txt</b> từ máy tính của bạn để tải dữ liệu lên:</p>
+            <label class="upload-btn">
+                📂 Chọn file index.txt
+                <input type="file" id="txtFileInput" accept=".txt" onchange="handleFileUpload(event)">
+            </label>
+        </div>
+
         <!-- Form Nhập Liệu & Sửa -->
         <div class="form-box">
             <form id="dataForm" onsubmit="handleFormSubmit(event)">
@@ -176,14 +214,14 @@
                 <div class="btn-group">
                     <button type="submit" class="btn-save" id="submitBtn">Lưu tạm</button>
                     <button type="button" class="btn-cancel" id="cancelBtn" onclick="resetForm()">Hủy sửa</button>
-                    <button type="button" class="btn-export" onclick="exportIndexFile()">Tải file index.txt</button>
+                    <button type="button" class="btn-export" onclick="exportIndexFile()">Tải file data để lưu</button>
                 </div>
             </form>
         </div>
 
         <!-- Danh sách hiển thị -->
         <div id="accountContainer">
-            <p style="text-align: center; color: #777;">Đang tải dữ liệu...</p>
+            <p style="text-align: center; color: #777;">Chưa có dữ liệu. Vui lòng tải lên file index.txt ở trên.</p>
         </div>
     </div>
 
@@ -191,24 +229,27 @@
         let accounts = [];
         let editIndex = -1;
 
-        async function initData() {
+        function initData() {
             const savedData = localStorage.getItem('github_video_prompts');
             if (savedData) {
                 accounts = JSON.parse(savedData);
                 renderAccounts();
-            } else {
-                try {
-                    const response = await fetch('index.txt');
-                    if (!response.ok) throw new Error('Không thể tải file index.txt');
-                    const text = await response.text();
-                    accounts = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-                    saveToLocalStorage();
-                    renderAccounts();
-                } catch (error) {
-                    console.error(error);
-                    document.getElementById('accountContainer').innerHTML = '<p style="text-align: center; color: red;">Không tìm thấy hoặc không đọc được file index.txt!</p>';
-                }
             }
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                accounts = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+                saveToLocalStorage();
+                renderAccounts();
+                alert(`Đã tải thành công ${accounts.length} dòng dữ liệu từ file!`);
+            };
+            reader.readAsText(file);
         }
 
         function saveToLocalStorage() {
@@ -228,16 +269,19 @@
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'account-item';
 
+                // Khung text hiển thị 1 dòng, có tooltip đầy đủ khi rê chuột
                 const textSpan = document.createElement('div');
                 textSpan.className = 'acc-text';
                 textSpan.innerText = acc;
+                textSpan.title = acc; // Rê chuột vào sẽ thấy toàn bộ nội dung dài
 
+                // Nhóm nút thao tác nằm chung hàng
                 const actionDiv = document.createElement('div');
                 actionDiv.className = 'action-buttons';
 
                 const copyBtn = document.createElement('button');
                 copyBtn.className = 'copy-btn';
-                copyBtn.innerText = 'Copy Prompt';
+                copyBtn.innerText = 'Copy';
                 copyBtn.onclick = () => copyAction(acc, copyBtn);
 
                 const editBtn = document.createElement('button');
@@ -246,7 +290,7 @@
                 editBtn.onclick = () => startEdit(index);
 
                 const deleteBtn = document.createElement('button');
-                deleteBtn.className, deleteBtn.className = 'delete-btn';
+                deleteBtn.className = 'delete-btn';
                 deleteBtn.innerText = 'Xóa';
                 deleteBtn.onclick = () => deleteItem(index);
 
@@ -262,7 +306,6 @@
 
         function handleFormSubmit(event) {
             event.preventDefault();
-            // Lấy nội dung textarea, thay thế các khoảng ngắt dòng thành khoảng trắng để mỗi prompt nằm trọn trên 1 dòng duy nhất trong file index.txt
             const rawVal = document.getElementById('itemDataInput').value.trim();
             const inputVal = rawVal.replace(/(\r\n|\n|\r)/gm, " ");
 
@@ -293,7 +336,7 @@
             editIndex = -1;
             document.getElementById('itemDataInput').value = '';
             document.getElementById('formTitle').innerText = 'Thêm đoạn văn bản / prompt mới:';
-            document.getElementById('submitBtn').innerText = 'Lưu tạm';
+            document.getElementById('submitBtn').innerText = 'Lưu';
             document.getElementById('cancelBtn').style.display = 'none';
         }
 
@@ -307,7 +350,6 @@
         }
 
         function copyAction(fullText, currentButton) {
-            // Sao chép toàn bộ nội dung prompt dài
             navigator.clipboard.writeText(fullText).then(() => {
                 document.querySelectorAll('.copy-btn').forEach(btn => btn.classList.remove('hidden-btn'));
                 currentButton.classList.add('hidden-btn');
