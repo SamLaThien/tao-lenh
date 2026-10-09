@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản Lý Prompt Video (GitHub Pages)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            padding: 30px 10px;
+            margin: 0;
+        }
+
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 650px; /* Mở rộng chiều ngang cho dễ nhìn prompt dài */
+        }
+
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-top: 0;
+        }
+
+        /* Form nhập liệu */
+        .form-box {
+            background: #fafafa;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 10px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: bold;
+            color: #555;
+            margin-bottom: 5px;
+        }
+
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 8px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .btn-save {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-save:hover { background-color: #218838; }
+
+        .btn-export {
+            background-color: #17a2b8;
+            color: white;
+            margin-left: auto;
+        }
+        .btn-export:hover { background-color: #138496; }
+
+        .btn-cancel {
+            background-color: #6c757d;
+            color: white;
+            display: none;
+        }
+        .btn-cancel:hover { background-color: #5a6268; }
+
+        /* Danh sách item */
+        .account-item {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .account-item:last-child {
+            border-bottom: none;
+        }
+
+        .acc-text {
+            font-size: 14px;
+            color: #333;
+            white-space: pre-wrap;
+            word-break: break-word;
+            width: 100%;
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #eee;
+            margin-bottom: 10px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+            justify-content: flex-end;
+        }
+
+        .copy-btn {
+            background-color: #e1ecf4;
+            color: #39739d;
+            border: 1px solid #7aa7c7;
+        }
+        .copy-btn:hover { background-color: #b3d3ea; }
+
+        .edit-btn {
+            background-color: #ffc107;
+            color: #333;
+        }
+        .edit-btn:hover { background-color: #e0a800; }
+
+        .delete-btn {
+            background-color: #dc3545;
+            color: white;
+        }
+        .delete-btn:hover { background-color: #c82333; }
+
+        .copy-btn.hidden-btn {
+            visibility: hidden;
+            opacity: 0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h2>Quản Lý Prompt Video</h2>
+
+        <!-- Form Nhập Liệu & Sửa -->
+        <div class="form-box">
+            <form id="dataForm" onsubmit="handleFormSubmit(event)">
+                <div class="form-group">
+                    <label id="formTitle">Thêm đoạn văn bản / prompt mới:</label>
+                    <textarea id="itemDataInput" placeholder="Dán nội dung prompt tạo video vào đây..." required></textarea>
+                </div>
+                
+                <div class="btn-group">
+                    <button type="submit" class="btn-save" id="submitBtn">Lưu tạm</button>
+                    <button type="button" class="btn-cancel" id="cancelBtn" onclick="resetForm()">Hủy sửa</button>
+                    <button type="button" class="btn-export" onclick="exportIndexFile()">Tải file index.txt</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Danh sách hiển thị -->
+        <div id="accountContainer">
+            <p style="text-align: center; color: #777;">Đang tải dữ liệu...</p>
+        </div>
+    </div>
+
+    <script>
+        let accounts = [];
+        let editIndex = -1;
+
+        async function initData() {
+            const savedData = localStorage.getItem('github_video_prompts');
+            if (savedData) {
+                accounts = JSON.parse(savedData);
+                renderAccounts();
+            } else {
+                try {
+                    const response = await fetch('index.txt');
+                    if (!response.ok) throw new Error('Không thể tải file index.txt');
+                    const text = await response.text();
+                    accounts = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+                    saveToLocalStorage();
+                    renderAccounts();
+                } catch (error) {
+                    console.error(error);
+                    document.getElementById('accountContainer').innerHTML = '<p style="text-align: center; color: red;">Không tìm thấy hoặc không đọc được file index.txt!</p>';
+                }
+            }
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem('github_video_prompts', JSON.stringify(accounts));
+        }
+
+        function renderAccounts() {
+            const container = document.getElementById('accountContainer');
+            container.innerHTML = '';
+
+            if (accounts.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #777;">Chưa có dữ liệu nào.</p>';
+                return;
+            }
+
+            accounts.forEach((acc, index) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'account-item';
+
+                const textSpan = document.createElement('div');
+                textSpan.className = 'acc-text';
+                textSpan.innerText = acc;
+
+                const actionDiv = document.createElement('div');
+                actionDiv.className = 'action-buttons';
+
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'copy-btn';
+                copyBtn.innerText = 'Copy Prompt';
+                copyBtn.onclick = () => copyAction(acc, copyBtn);
+
+                const editBtn = document.createElement('button');
+                editBtn.className = 'edit-btn';
+                editBtn.innerText = 'Sửa';
+                editBtn.onclick = () => startEdit(index);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className, deleteBtn.className = 'delete-btn';
+                deleteBtn.innerText = 'Xóa';
+                deleteBtn.onclick = () => deleteItem(index);
+
+                actionDiv.appendChild(copyBtn);
+                actionDiv.appendChild(editBtn);
+                actionDiv.appendChild(deleteBtn);
+
+                itemDiv.appendChild(textSpan);
+                itemDiv.appendChild(actionDiv);
+                container.appendChild(itemDiv);
+            });
+        }
+
+        function handleFormSubmit(event) {
+            event.preventDefault();
+            // Lấy nội dung textarea, thay thế các khoảng ngắt dòng thành khoảng trắng để mỗi prompt nằm trọn trên 1 dòng duy nhất trong file index.txt
+            const rawVal = document.getElementById('itemDataInput').value.trim();
+            const inputVal = rawVal.replace(/(\r\n|\n|\r)/gm, " ");
+
+            if (!inputVal) return;
+
+            if (editIndex === -1) {
+                accounts.push(inputVal);
+            } else {
+                accounts[editIndex] = inputVal;
+                resetForm();
+            }
+
+            saveToLocalStorage();
+            renderAccounts();
+            document.getElementById('itemDataInput').value = '';
+        }
+
+        function startEdit(index) {
+            editIndex = index;
+            document.getElementById('itemDataInput').value = accounts[index];
+            document.getElementById('formTitle').innerText = `Sửa prompt (Dòng ${index + 1}):`;
+            document.getElementById('submitBtn').innerText = 'Cập Nhật';
+            document.getElementById('cancelBtn').style.display = 'inline-block';
+            document.getElementById('itemDataInput').focus();
+        }
+
+        function resetForm() {
+            editIndex = -1;
+            document.getElementById('itemDataInput').value = '';
+            document.getElementById('formTitle').innerText = 'Thêm đoạn văn bản / prompt mới:';
+            document.getElementById('submitBtn').innerText = 'Lưu tạm';
+            document.getElementById('cancelBtn').style.display = 'none';
+        }
+
+        function deleteItem(index) {
+            if (confirm('Bạn có chắc chắn muốn xóa prompt này?')) {
+                accounts.splice(index, 1);
+                saveToLocalStorage();
+                renderAccounts();
+                if (editIndex === index) resetForm();
+            }
+        }
+
+        function copyAction(fullText, currentButton) {
+            // Sao chép toàn bộ nội dung prompt dài
+            navigator.clipboard.writeText(fullText).then(() => {
+                document.querySelectorAll('.copy-btn').forEach(btn => btn.classList.remove('hidden-btn'));
+                currentButton.classList.add('hidden-btn');
+            }).catch(err => {
+                alert('Lỗi copy: ' + err);
+            });
+        }
+
+        function exportIndexFile() {
+            const fileContent = accounts.join('\n');
+            const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'index.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        initData();
+    </script>
+
+</body>
+
+</html>
